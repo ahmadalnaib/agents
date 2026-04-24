@@ -13,6 +13,7 @@ class WorkflowStep extends Model
         'title',
         'description',
         'status',
+        'qa_conversation_id',
     ];
 
     public function workflow()

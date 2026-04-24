@@ -2,8 +2,10 @@ import { useHttp } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import { Sparkles, ScrollText, Link as LinkIcon, LoaderCircle } from 'lucide-react';
 import { advice as workflowAdvice } from '@/routes/workflow';
+import { ask as askWorkflowStep, toggle as toggleWorkflowStep } from '@/routes/workflow/steps';
 
 type WorkflowStep = {
+    id: number;
     number: number;
     title: string;
     description: string;
@@ -33,8 +35,18 @@ export default function WorkflowAssistant() {
     });
 
     const [payload, setPayload] = useState<WorkflowPayload | null>(null);
+    const [askInputs, setAskInputs] = useState<Record<number, string>>({});
+    const [askLoading, setAskLoading] = useState<Record<number, boolean>>({});
+    const [askErrors, setAskErrors] = useState<Record<number, string>>({});
+    const [threads, setThreads] = useState<Record<number, Array<{ question: string; answer: string }>>>({});
+    const [toggleLoading, setToggleLoading] = useState<Record<number, boolean>>({});
 
     const stepsCount = useMemo(() => payload?.steps.length ?? 0, [payload]);
+    const doneStepsCount = useMemo(
+        () => payload?.steps.filter((step) => step.status === 'done').length ?? 0,
+        [payload],
+    );
+    const progressPercentage = stepsCount > 0 ? Math.round((doneStepsCount / stepsCount) * 100) : 0;
 
     const getLinksForStep = (stepNumber: number): WorkflowLink[] => {
         if (!payload || payload.links.length === 0 || payload.steps.length === 0) {
@@ -56,8 +68,97 @@ export default function WorkflowAssistant() {
             onSuccess: (response: WorkflowPayload) => {
                 setPayload(response);
                 setData('problem', '');
+                setThreads({});
+                setAskInputs({});
+                setAskErrors({});
             },
         });
+    };
+
+    const getCsrfToken = () => {
+        const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+        return token ?? '';
+    };
+
+    const handleToggleStep = async (stepId: number) => {
+        if (!payload) {
+            return;
+        }
+
+        setToggleLoading((prev) => ({ ...prev, [stepId]: true }));
+
+        try {
+            const response = await fetch(toggleWorkflowStep.url({ step: stepId }), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                },
+            });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const result = (await response.json()) as { step: { id: number; status: 'pending' | 'done' } };
+
+            setPayload((prev) => {
+                if (!prev) {
+                    return prev;
+                }
+
+                return {
+                    ...prev,
+                    steps: prev.steps.map((step) =>
+                        step.id === result.step.id ? { ...step, status: result.step.status } : step,
+                    ),
+                };
+            });
+        } finally {
+            setToggleLoading((prev) => ({ ...prev, [stepId]: false }));
+        }
+    };
+
+    const handleAskStep = async (step: WorkflowStep) => {
+        const question = (askInputs[step.id] ?? '').trim();
+
+        if (question.length < 2) {
+            setAskErrors((prev) => ({ ...prev, [step.id]: 'Please enter a question.' }));
+            return;
+        }
+
+        setAskLoading((prev) => ({ ...prev, [step.id]: true }));
+        setAskErrors((prev) => ({ ...prev, [step.id]: '' }));
+
+        try {
+            const response = await fetch(askWorkflowStep.url({ step: step.id }), {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Accept: 'application/json',
+                    'X-CSRF-TOKEN': getCsrfToken(),
+                },
+                body: JSON.stringify({ question }),
+            });
+
+            if (!response.ok) {
+                setAskErrors((prev) => ({ ...prev, [step.id]: 'Unable to get an answer right now.' }));
+                return;
+            }
+
+            const result = (await response.json()) as { answer: string };
+
+            setThreads((prev) => ({
+                ...prev,
+                [step.id]: [...(prev[step.id] ?? []), { question, answer: result.answer }],
+            }));
+
+            setAskInputs((prev) => ({ ...prev, [step.id]: '' }));
+        } finally {
+            setAskLoading((prev) => ({ ...prev, [step.id]: false }));
+        }
     };
 
     return (
@@ -144,6 +245,21 @@ export default function WorkflowAssistant() {
                                 {payload.workflow.summary && (
                                     <p className="mt-1 text-sm text-slate-600">{payload.workflow.summary}</p>
                                 )}
+
+                                <div className="mt-3 space-y-1.5">
+                                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                                        <span>Progress</span>
+                                        <span>
+                                            {doneStepsCount}/{stepsCount} done
+                                        </span>
+                                    </div>
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                                        <div
+                                            className="h-full rounded-full bg-cyan-500 transition-all"
+                                            style={{ width: `${progressPercentage}%` }}
+                                        />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="space-y-3">
@@ -155,13 +271,35 @@ export default function WorkflowAssistant() {
                                             key={`${step.number}-${step.title}`}
                                             className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
                                         >
-                                            <div className="flex items-center gap-2">
-                                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-200 text-xs font-bold text-amber-900">
-                                                    {step.number}
-                                                </span>
-                                                <p className="text-sm font-bold text-slate-900">{step.title}</p>
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-200 text-xs font-bold text-amber-900">
+                                                        {step.number}
+                                                    </span>
+                                                    <p className="text-sm font-bold text-slate-900">{step.title}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleToggleStep(step.id)}
+                                                    disabled={toggleLoading[step.id] === true}
+                                                    className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                >
+                                                    {toggleLoading[step.id] ? 'Saving...' : step.status === 'done' ? 'Undo' : 'Mark done'}
+                                                </button>
                                             </div>
-                                            <p className="mt-1 text-sm text-slate-600">{step.description}</p>
+
+                                            <div className="mt-1 flex items-center gap-2">
+                                                <span
+                                                    className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${step.status === 'done'
+                                                            ? 'bg-emerald-100 text-emerald-700'
+                                                            : 'bg-amber-100 text-amber-700'
+                                                        }`}
+                                                >
+                                                    {step.status === 'done' ? 'Done' : 'Pending'}
+                                                </span>
+                                            </div>
+
+                                            <p className="mt-2 text-sm text-slate-600">{step.description}</p>
 
                                             {stepLinks.length > 0 && (
                                                 <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50/70 p-2.5">
@@ -187,6 +325,52 @@ export default function WorkflowAssistant() {
                                                     </ul>
                                                 </div>
                                             )}
+
+                                            <div className="mt-3 rounded-lg border border-slate-200 bg-white/90 p-2.5">
+                                                <p className="mb-2 text-xs font-semibold text-slate-700">Ask about this step</p>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        value={askInputs[step.id] ?? ''}
+                                                        onChange={(event) => {
+                                                            const value = event.currentTarget.value;
+                                                            setAskInputs((prev) => ({
+                                                                ...prev,
+                                                                [step.id]: value,
+                                                            }));
+                                                        }}
+                                                        placeholder="How long does this take? What documents?"
+                                                        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs outline-none focus:border-cyan-400"
+                                                        disabled={askLoading[step.id] === true}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAskStep(step)}
+                                                        disabled={askLoading[step.id] === true}
+                                                        className="rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    >
+                                                        {askLoading[step.id] ? 'Asking...' : 'Ask'}
+                                                    </button>
+                                                </div>
+                                                {askErrors[step.id] && (
+                                                    <p className="mt-1 text-xs font-medium text-rose-600">{askErrors[step.id]}</p>
+                                                )}
+
+                                                {(threads[step.id] ?? []).length > 0 && (
+                                                    <div className="mt-2 space-y-2">
+                                                        {(threads[step.id] ?? []).map((item, index) => (
+                                                            <div
+                                                                key={`${step.id}-thread-${index}`}
+                                                                className="rounded-lg border border-slate-200 bg-slate-50 p-2"
+                                                            >
+                                                                <p className="text-xs font-semibold text-slate-700">Q: {item.question}</p>
+                                                                <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-slate-600">
+                                                                    A: {item.answer}
+                                                                </p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </article>
                                     );
                                 })}

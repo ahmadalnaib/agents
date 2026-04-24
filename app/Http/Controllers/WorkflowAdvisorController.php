@@ -41,7 +41,7 @@ class WorkflowAdvisorController extends Controller
         $summary = trim((string) ($decoded['summary'] ?? ''));
 
         $steps = collect($decoded['steps'] ?? [])
-            ->filter(fn(mixed $step): bool => is_array($step))
+            ->filter(fn (mixed $step): bool => is_array($step))
             ->map(function (array $step): array {
                 $status = (string) ($step['status'] ?? 'pending');
 
@@ -51,7 +51,7 @@ class WorkflowAdvisorController extends Controller
                     'status' => $status === 'done' ? 'done' : 'pending',
                 ];
             })
-            ->filter(fn(array $step): bool => $step['title'] !== '' && $step['description'] !== '')
+            ->filter(fn (array $step): bool => $step['title'] !== '' && $step['description'] !== '')
             ->values();
 
         if ($steps->isEmpty()) {
@@ -65,12 +65,12 @@ class WorkflowAdvisorController extends Controller
         }
 
         $links = collect($decoded['links'] ?? [])
-            ->filter(fn(mixed $link): bool => is_array($link))
-            ->map(fn(array $link): array => [
+            ->filter(fn (mixed $link): bool => is_array($link))
+            ->map(fn (array $link): array => [
                 'title' => trim((string) ($link['title'] ?? 'Reference')),
                 'url' => trim((string) ($link['url'] ?? '')),
             ])
-            ->filter(fn(array $link): bool => filter_var($link['url'], FILTER_VALIDATE_URL) !== false)
+            ->filter(fn (array $link): bool => filter_var($link['url'], FILTER_VALIDATE_URL) !== false)
             ->unique('url')
             ->take(6)
             ->values();
@@ -105,7 +105,8 @@ class WorkflowAdvisorController extends Controller
             'steps' => $workflow->steps
                 ->sortBy('step_number')
                 ->values()
-                ->map(fn($step): array => [
+                ->map(fn ($step): array => [
+                    'id' => $step->id,
                     'number' => $step->step_number,
                     'title' => $step->title,
                     'description' => $step->description,
