@@ -14,8 +14,8 @@ class AgentController extends Controller
             'message' => 'required|string',
         ]);
 
-        $response = SalesCoach::make(auth()->user())
-            ->prompt($validated['message']);
+        $response = SalesCoach::make(auth()->user())->forUser(auth()->user())
+                    ->prompt($validated['message']);
 
         return response()->json([
             'message' => (string) $response,

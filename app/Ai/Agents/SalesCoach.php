@@ -6,6 +6,7 @@ use App\Ai\Tools\ListCateogyTool;
 use App\Ai\Tools\ListOrderTool;
 use App\Ai\Tools\ListProductTool;
 use App\Models\User;
+use Laravel\Ai\Concerns\RemembersConversations;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
 use Laravel\Ai\Contracts\HasTools;
@@ -16,7 +17,7 @@ use Stringable;
 
 class SalesCoach implements Agent, Conversational, HasTools
 {
-    use Promptable;
+    use Promptable, RemembersConversations;
 
     public function __construct(public User $user) {}
 
@@ -33,10 +34,10 @@ class SalesCoach implements Agent, Conversational, HasTools
      *
      * @return Message[]
      */
-    public function messages(): iterable
-    {
-        return [];
-    }
+    // public function messages(): iterable
+    // {
+    //     return [];
+    // }
 
     /**
      * Get the tools available to the agent.

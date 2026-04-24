@@ -6,7 +6,7 @@ use App\Models\Product;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
-use Stringable;
+use Stringable ;
 
 class ListProductTool implements Tool
 {
