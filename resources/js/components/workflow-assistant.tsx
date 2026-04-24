@@ -36,6 +36,17 @@ export default function WorkflowAssistant() {
 
     const stepsCount = useMemo(() => payload?.steps.length ?? 0, [payload]);
 
+    const getLinksForStep = (stepNumber: number): WorkflowLink[] => {
+        if (!payload || payload.links.length === 0 || payload.steps.length === 0) {
+            return [];
+        }
+
+        const linksPerStep = Math.max(1, Math.ceil(payload.links.length / payload.steps.length));
+        const start = (stepNumber - 1) * linksPerStep;
+
+        return payload.links.slice(start, start + linksPerStep);
+    };
+
     const handleSubmit = () => {
         if (!data.problem.trim()) {
             return;
@@ -109,19 +120,18 @@ export default function WorkflowAssistant() {
                         <h3 className="text-sm font-bold uppercase tracking-[0.14em]">Workflow Result</h3>
                     </div>
 
-                    {!payload && !processing && (
-                        <div className="space-y-3">
-                            <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-                            <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
-                            <div className="h-4 w-5/6 animate-pulse rounded bg-slate-200" />
-                        </div>
-                    )}
-
                     {processing && (
-                        <div className="flex items-center gap-2 text-sm text-slate-600">
-                            <LoaderCircle className="h-4 w-4 animate-spin" />
-                            Building your workflow...
-                        </div>
+                        <>
+                            <div className="flex items-center gap-2 text-sm text-slate-600">
+                                <LoaderCircle className="h-4 w-4 animate-spin" />
+                                Building your workflow...
+                            </div>
+                            <div className="space-y-3">
+                                <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                                <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+                                <div className="h-4 w-5/6 animate-pulse rounded bg-slate-200" />
+                            </div>
+                        </>
                     )}
 
                     {payload && (
@@ -137,44 +147,50 @@ export default function WorkflowAssistant() {
                             </div>
 
                             <div className="space-y-3">
-                                {payload.steps.map((step) => (
-                                    <article
-                                        key={`${step.number}-${step.title}`}
-                                        className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
-                                    >
-                                        <div className="flex items-center gap-2">
-                                            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-200 text-xs font-bold text-amber-900">
-                                                {step.number}
-                                            </span>
-                                            <p className="text-sm font-bold text-slate-900">{step.title}</p>
-                                        </div>
-                                        <p className="mt-1 text-sm text-slate-600">{step.description}</p>
-                                    </article>
-                                ))}
-                            </div>
+                                {payload.steps.map((step) => {
+                                    const stepLinks = getLinksForStep(step.number);
 
-                            {payload.links.length > 0 && (
-                                <div className="rounded-xl border border-cyan-200 bg-cyan-50/70 p-3">
-                                    <div className="mb-2 flex items-center gap-2">
-                                        <LinkIcon className="h-4 w-4 text-cyan-800" />
-                                        <p className="text-sm font-bold text-cyan-900">Sources</p>
-                                    </div>
-                                    <ul className="space-y-1.5 text-sm">
-                                        {payload.links.map((link) => (
-                                            <li key={link.url}>
-                                                <a
-                                                    href={link.url}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="text-cyan-800 underline decoration-cyan-300 underline-offset-2 hover:text-cyan-900"
-                                                >
-                                                    {link.title}
-                                                </a>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
+                                    return (
+                                        <article
+                                            key={`${step.number}-${step.title}`}
+                                            className="rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-200 text-xs font-bold text-amber-900">
+                                                    {step.number}
+                                                </span>
+                                                <p className="text-sm font-bold text-slate-900">{step.title}</p>
+                                            </div>
+                                            <p className="mt-1 text-sm text-slate-600">{step.description}</p>
+
+                                            {stepLinks.length > 0 && (
+                                                <div className="mt-3 rounded-lg border border-cyan-200 bg-cyan-50/70 p-2.5">
+                                                    <div className="mb-1.5 flex items-center gap-1.5">
+                                                        <LinkIcon className="h-3.5 w-3.5 text-cyan-800" />
+                                                        <p className="text-xs font-bold uppercase tracking-[0.12em] text-cyan-900">
+                                                            Links
+                                                        </p>
+                                                    </div>
+                                                    <ul className="space-y-1 text-xs">
+                                                        {stepLinks.map((link) => (
+                                                            <li key={link.url}>
+                                                                <a
+                                                                    href={link.url}
+                                                                    target="_blank"
+                                                                    rel="noreferrer"
+                                                                    className="break-words text-cyan-800 underline decoration-cyan-300 underline-offset-2 hover:text-cyan-900"
+                                                                >
+                                                                    {link.title}
+                                                                </a>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </article>
+                                    );
+                                })}
+                            </div>
                         </div>
                     )}
                 </div>
