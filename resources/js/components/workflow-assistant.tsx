@@ -291,8 +291,8 @@ export default function WorkflowAssistant() {
                                             <div className="mt-1 flex items-center gap-2">
                                                 <span
                                                     className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${step.status === 'done'
-                                                            ? 'bg-emerald-100 text-emerald-700'
-                                                            : 'bg-amber-100 text-amber-700'
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : 'bg-amber-100 text-amber-700'
                                                         }`}
                                                 >
                                                     {step.status === 'done' ? 'Done' : 'Pending'}
